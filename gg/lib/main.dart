@@ -1621,7 +1621,10 @@ class HoverVolumeSlider extends StatefulWidget {
 }
 
 class _HoverVolumeSliderState extends State<HoverVolumeSlider> {
-  bool _isHovered = false;
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
+  bool _isHoveringIcon = false;
+  bool _isHoveringSlider = false;
   bool _isDragging = false;
   double _localVolume = 0.0;
 
@@ -1631,71 +1634,143 @@ class _HoverVolumeSliderState extends State<HoverVolumeSlider> {
     _localVolume = widget.volume;
   }
 
+  void _showOverlay() {
+    if (_overlayEntry != null) return;
+    _localVolume = widget.volume;
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) {
+        return Positioned(
+          width: 50,
+          height: 160,
+          child: CompositedTransformFollower(
+            link: _layerLink,
+            offset: const Offset(-9, -150),
+            showWhenUnlinked: false,
+            child: MouseRegion(
+              onEnter: (_) {
+                _isHoveringSlider = true;
+              },
+              onExit: (_) {
+                _isHoveringSlider = false;
+                _checkHide();
+              },
+              child: StatefulBuilder(
+                builder: (context, setOverlayState) {
+                  return Stack(
+                    alignment: Alignment.topCenter,
+                    children: [
+                      // The actual visual slider container
+                      Material(
+                        elevation: 8,
+                        borderRadius: BorderRadius.circular(20),
+                        color: Theme.of(context).cardColor,
+                        child: SizedBox(
+                          width: 40,
+                          height: 130,
+                          child: RotatedBox(
+                            quarterTurns: 3,
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 4.0,
+                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
+                              ),
+                              child: Slider(
+                                value: _localVolume,
+                                min: 0.0,
+                                max: 1.0,
+                                onChangeStart: (_) => _isDragging = true,
+                                onChangeEnd: (_) {
+                                  _isDragging = false;
+                                  _checkHide();
+                                },
+                                onChanged: (val) {
+                                  setOverlayState(() {
+                                    _localVolume = val;
+                                  });
+                                  widget.onChanged(val);
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Transparent area to bridge the gap between slider and icon
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: 30,
+                        child: Container(color: Colors.transparent),
+                      ),
+                    ],
+                  );
+                }
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _hideOverlay() {
+    if (_isDragging) return;
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  void _checkHide() async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!_isHoveringIcon && !_isHoveringSlider && !_isDragging && mounted) {
+      _hideOverlay();
+    }
+  }
+
+  @override
+  void dispose() {
+    _hideOverlay();
+    super.dispose();
+  }
+
   @override
   void didUpdateWidget(HoverVolumeSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_isDragging) {
       _localVolume = widget.volume;
+      _overlayEntry?.markNeedsBuild();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.bottomCenter,
-        children: [
-          IconButton(
-            icon: Icon(
-              widget.volume == 0
-                  ? Icons.volume_off
-                  : widget.volume < 0.5
-                      ? Icons.volume_down
-                      : Icons.volume_up,
-              color: Colors.grey,
-            ),
-            onPressed: () {
-              widget.onChanged(widget.volume == 0 ? 1.0 : 0.0);
-            },
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: MouseRegion(
+        onEnter: (_) {
+          _isHoveringIcon = true;
+          _showOverlay();
+        },
+        onExit: (_) {
+          _isHoveringIcon = false;
+          _checkHide();
+        },
+        child: IconButton(
+          icon: Icon(
+            widget.volume == 0
+                ? Icons.volume_off
+                : widget.volume < 0.5
+                    ? Icons.volume_down
+                    : Icons.volume_up,
+            color: Colors.grey,
           ),
-          if (_isHovered || _isDragging)
-            Positioned(
-              bottom: 40,
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(20),
-                color: Theme.of(context).cardColor,
-                child: SizedBox(
-                  width: 40,
-                  height: 120,
-                  child: RotatedBox(
-                    quarterTurns: 3,
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 4.0,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
-                      ),
-                      child: Slider(
-                        value: _localVolume,
-                        min: 0.0,
-                        max: 1.0,
-                        onChangeStart: (_) => setState(() => _isDragging = true),
-                        onChangeEnd: (_) => setState(() => _isDragging = false),
-                        onChanged: (val) {
-                          setState(() => _localVolume = val);
-                          widget.onChanged(val);
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
+          onPressed: () {
+            widget.onChanged(widget.volume == 0 ? 1.0 : 0.0);
+          },
+        ),
       ),
     );
   }
