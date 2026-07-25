@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:gg/controllers.dart';
 
@@ -99,17 +100,20 @@ class _EQSheetState extends State<EQSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      height: 420,
-      decoration: BoxDecoration(
-        color: Colors.grey[950],
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+    return ClipRRect(
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(20),
+        topRight: Radius.circular(20),
       ),
-      child: Column(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+        child: Container(
+          padding: const EdgeInsets.all(16.0),
+          height: 420,
+          decoration: BoxDecoration(
+            color: Colors.grey[950]!.withOpacity(0.65),
+          ),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -192,6 +196,8 @@ class _EQSheetState extends State<EQSheet> {
             ),
           ),
         ],
+      ),
+    ),
       ),
     );
   }
