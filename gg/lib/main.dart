@@ -761,6 +761,13 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final currentSongs = _queueController?.currentSongs;
+    final currentSong = (_queueController != null &&
+            currentSongs != null &&
+            _queueController!.activeIndex >= 0 &&
+            _queueController!.activeIndex < currentSongs.length)
+        ? currentSongs[_queueController!.activeIndex]
+        : null;
 
     return Container(
       width: 200,
@@ -796,7 +803,61 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             );
           }),
+          const Spacer(),
+          if (_layoutManager.currentMode == AppLayoutMode.spotify && currentSong != null)
+             Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: AspectRatio(
+                  aspectRatio: 1,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: DefaultCoverImage(
+                      imageUrl: currentSong.coverUrl,
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                  ),
+                ),
+             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTopNavBar() {
+    final items = [
+      {'icon': Icons.music_note, 'label': 'All Songs'},
+      {'icon': Icons.playlist_play, 'label': 'Playlists'},
+      {'icon': Icons.favorite, 'label': 'Liked Songs'},
+      {'icon': Icons.settings, 'label': 'Settings'},
+    ];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      height: 60,
+      color: isDark ? Colors.grey[900] : Colors.grey[200],
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(items.length, (index) {
+          final item = items[index];
+          final isSelected = _currentViewIndex == index;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: ChoiceChip(
+              label: Text(item['label'] as String),
+              selected: isSelected,
+              avatar: Icon(item['icon'] as IconData, size: 18, color: isSelected ? Colors.white : null),
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() {
+                    _currentViewIndex = index;
+                    if (index == 1) _selectedPlaylist = null;
+                  });
+                }
+              },
+            ),
+          );
+        }),
       ),
     );
   }
@@ -1428,13 +1489,19 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         );
       case AppLayoutMode.ytMusic:
-        return Row(
+        return Column(
           children: [
-            _buildSidebar(),
-            const VerticalDivider(width: 1, color: Colors.grey),
-            Expanded(flex: 4, child: _buildMainContent()),
-            const VerticalDivider(width: 1, color: Colors.grey),
-            Expanded(flex: 2, child: _buildSidePanel()),
+            _buildTopNavBar(),
+            const Divider(height: 1, color: Colors.grey),
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(flex: 4, child: _buildMainContent()),
+                  const VerticalDivider(width: 1, color: Colors.grey),
+                  Expanded(flex: 2, child: _buildSidePanel()),
+                ],
+              ),
+            ),
           ],
         );
       case AppLayoutMode.custom:
@@ -1530,15 +1597,17 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 8),
             Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: DefaultCoverImage(
-                    imageUrl: currentSong.coverUrl,
-                    width: 48,
-                    height: 48,
+                if (_layoutManager.currentMode != AppLayoutMode.spotify)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: DefaultCoverImage(
+                      imageUrl: currentSong.coverUrl,
+                      width: 48,
+                      height: 48,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
+                if (_layoutManager.currentMode != AppLayoutMode.spotify)
+                  const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
