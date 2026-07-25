@@ -1621,130 +1621,81 @@ class HoverVolumeSlider extends StatefulWidget {
 }
 
 class _HoverVolumeSliderState extends State<HoverVolumeSlider> {
-  final LayerLink _layerLink = LayerLink();
-  OverlayEntry? _overlayEntry;
-  bool _isHoveringIcon = false;
-  bool _isHoveringSlider = false;
-
-  void _showOverlay() {
-    if (_overlayEntry != null) return;
-
-    double localVolume = widget.volume;
-
-    _overlayEntry = OverlayEntry(
-      builder: (context) {
-        return Positioned(
-          width: 40,
-          height: 120,
-          child: CompositedTransformFollower(
-            link: _layerLink,
-            offset: const Offset(-8, -120),
-            showWhenUnlinked: false,
-            child: MouseRegion(
-              onEnter: (_) {
-                _isHoveringSlider = true;
-              },
-              onExit: (_) {
-                _isHoveringSlider = false;
-                _checkHide();
-              },
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(20),
-                color: Theme.of(context).cardColor,
-                child: RotatedBox(
-                  quarterTurns: 3,
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4.0,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
-                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
-                    ),
-                    child: StatefulBuilder(
-                      builder: (context, setOverlayState) {
-                        return Slider(
-                          value: localVolume,
-                          min: 0.0,
-                          max: 1.0,
-                          onChanged: (newVolume) {
-                            setOverlayState(() {
-                              localVolume = newVolume;
-                            });
-                            widget.onChanged(newVolume);
-                          },
-                        );
-                      }
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    Overlay.of(context).insert(_overlayEntry!);
-  }
-
-  void _hideOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-  }
-
-  void _checkHide() async {
-    await Future.delayed(const Duration(milliseconds: 100));
-    if (!_isHoveringIcon && !_isHoveringSlider && mounted) {
-      _hideOverlay();
-    }
-  }
+  bool _isHovered = false;
+  bool _isDragging = false;
+  double _localVolume = 0.0;
 
   @override
-  void dispose() {
-    _hideOverlay();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _localVolume = widget.volume;
   }
 
   @override
   void didUpdateWidget(HoverVolumeSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // If we want to sync the overlay to external volume changes (e.g. mute button), 
-    // we would need a way to pass the new volume to the StatefulBuilder.
-    // Rebuilding the overlay entry is sufficient since it captures the new widget.volume 
-    // on next overlay display, but if the overlay is already open, it needs syncing.
-    // For simplicity, we just mark NeedsBuild, but because localVolume is in the closure, 
-    // it won't magically update localVolume. The best way is to only use widget.volume.
-    if (oldWidget.volume != widget.volume) {
-      _overlayEntry?.markNeedsBuild();
+    if (!_isDragging) {
+      _localVolume = widget.volume;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: MouseRegion(
-        onEnter: (_) {
-          _isHoveringIcon = true;
-          _showOverlay();
-        },
-        onExit: (_) {
-          _isHoveringIcon = false;
-          _checkHide();
-        },
-        child: IconButton(
-          icon: Icon(
-            widget.volume == 0
-                ? Icons.volume_off
-                : widget.volume < 0.5
-                    ? Icons.volume_down
-                    : Icons.volume_up,
-            color: Colors.grey,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.bottomCenter,
+        children: [
+          IconButton(
+            icon: Icon(
+              widget.volume == 0
+                  ? Icons.volume_off
+                  : widget.volume < 0.5
+                      ? Icons.volume_down
+                      : Icons.volume_up,
+              color: Colors.grey,
+            ),
+            onPressed: () {
+              widget.onChanged(widget.volume == 0 ? 1.0 : 0.0);
+            },
           ),
-          onPressed: () {
-            widget.onChanged(widget.volume == 0 ? 1.0 : 0.0);
-          },
-        ),
+          if (_isHovered || _isDragging)
+            Positioned(
+              bottom: 40,
+              child: Material(
+                elevation: 8,
+                borderRadius: BorderRadius.circular(20),
+                color: Theme.of(context).cardColor,
+                child: SizedBox(
+                  width: 40,
+                  height: 120,
+                  child: RotatedBox(
+                    quarterTurns: 3,
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 4.0,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
+                      ),
+                      child: Slider(
+                        value: _localVolume,
+                        min: 0.0,
+                        max: 1.0,
+                        onChangeStart: (_) => setState(() => _isDragging = true),
+                        onChangeEnd: (_) => setState(() => _isDragging = false),
+                        onChanged: (val) {
+                          setState(() => _localVolume = val);
+                          widget.onChanged(val);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
