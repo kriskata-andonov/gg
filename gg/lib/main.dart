@@ -1585,6 +1585,66 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Widget _buildLayoutPreview() {
+    return Container(
+      height: 120,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.withOpacity(0.5)),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.black26,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 12,
+            decoration: BoxDecoration(color: Colors.blueGrey[800], borderRadius: const BorderRadius.vertical(top: Radius.circular(8))),
+          ),
+          if (_layoutManager.navStyle == 'topBar' && _layoutManager.panelVisibility['sidebar'] == true)
+            Container(height: 12, color: Colors.blueGrey[700]),
+          
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _layoutManager.customOrder.map((panel) {
+                if (_layoutManager.panelVisibility[panel] != true) return const SizedBox.shrink();
+                if (panel == 'sidebar' && _layoutManager.navStyle == 'topBar') return const SizedBox.shrink();
+
+                Color color = Colors.grey;
+                int flex = 1;
+                if (panel == 'sidebar') { color = Colors.green[900]!; flex = 1; }
+                if (panel == 'main') { color = Colors.blue[900]!; flex = 3; }
+                if (panel == 'sidepanel') { color = Colors.red[900]!; flex = 2; }
+                
+                return Expanded(
+                  flex: flex,
+                  child: Container(
+                    margin: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Center(
+                      child: Text(
+                        panel == 'sidebar' ? 'Nav' : panel == 'main' ? 'Main' : 'Side',
+                        style: const TextStyle(fontSize: 10, color: Colors.white70),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          Container(
+            height: 16, 
+            decoration: BoxDecoration(color: Colors.purple[900], borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8))),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showLayoutSettings() {
     showDialog(
       context: context,
@@ -1595,10 +1655,11 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('Layout Settings'),
               content: SizedBox(
                 width: 400,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                     ...AppLayoutMode.values.map((mode) {
                       return RadioListTile<AppLayoutMode>(
                         title: Text(mode.name.toUpperCase()),
@@ -1633,6 +1694,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           },
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: Text('Live Preview:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      _buildLayoutPreview(),
                       const SizedBox(height: 16),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -1695,7 +1762,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: ListTile(
                                 leading: Icon(icon),
                                 title: Text(displayName),
-                                trailing: const Icon(Icons.drag_handle),
                                 enabled: _layoutManager.panelVisibility[panel] == true,
                               ),
                             );
@@ -1706,6 +1772,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+            ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
