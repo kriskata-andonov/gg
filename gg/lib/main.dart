@@ -1888,9 +1888,13 @@ class _HoverVolumeSliderState extends State<HoverVolumeSlider> {
   @override
   void didUpdateWidget(HoverVolumeSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_isDragging) {
+    if (!_isDragging && oldWidget.volume != widget.volume) {
       _localVolume = widget.volume;
-      _overlayEntry?.markNeedsBuild();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _overlayEntry != null) {
+          _overlayEntry!.markNeedsBuild();
+        }
+      });
     }
   }
 
