@@ -105,15 +105,22 @@ class _EQSheetState extends State<EQSheet> {
         topLeft: Radius.circular(20),
         topRight: Radius.circular(20),
       ),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
-        child: Container(
-          padding: const EdgeInsets.all(16.0),
-          height: 420,
-          decoration: BoxDecoration(
-            color: Colors.grey[950]!.withOpacity(0.65),
-          ),
-          child: Column(
+      child: SizedBox(
+        height: 420,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.grey[950]!.withOpacity(0.65),
+              ),
+              child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -197,7 +204,9 @@ class _EQSheetState extends State<EQSheet> {
           ),
         ],
       ),
-    ),
+            ),
+          ],
+        ),
       ),
     );
   }
