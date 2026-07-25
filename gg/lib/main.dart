@@ -745,9 +745,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
               ],
             ),
-            bottomNavigationBar: _layoutManager.currentMode == AppLayoutMode.ytMusic 
-                ? null 
-                : _buildBottomPlayer(),
+            bottomNavigationBar: _buildBottomPlayer(),
           );
         },
       ),
@@ -1424,36 +1422,19 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildSidebar(),
             const VerticalDivider(width: 1, color: Colors.grey),
-            Expanded(child: _buildMainContent()),
+            Expanded(flex: 3, child: _buildMainContent()),
+            const VerticalDivider(width: 1, color: Colors.grey),
+            Expanded(flex: 1, child: _buildSidePanel()),
           ],
         );
       case AppLayoutMode.ytMusic:
-        return Column(
+        return Row(
           children: [
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _buildMainContent(),
-                  ),
-                  const VerticalDivider(width: 1, color: Colors.grey),
-                  Expanded(
-                    flex: 1,
-                    child: Column(
-                      children: [
-                        Expanded(child: _buildSidePanel()),
-                        const Divider(height: 1, color: Colors.grey),
-                        SizedBox(
-                          height: 140, 
-                          child: _buildBottomPlayer(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _buildSidebar(),
+            const VerticalDivider(width: 1, color: Colors.grey),
+            Expanded(flex: 4, child: _buildMainContent()),
+            const VerticalDivider(width: 1, color: Colors.grey),
+            Expanded(flex: 2, child: _buildSidePanel()),
           ],
         );
       case AppLayoutMode.custom:
