@@ -1505,12 +1505,21 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         );
       case AppLayoutMode.custom:
-        return const Center(
-          child: Text(
-            'Custom Modular Grid - Coming in Phase 2',
-            style: TextStyle(color: Colors.white, fontSize: 18),
-          ),
-        );
+        final children = <Widget>[];
+        for (int i = 0; i < _layoutManager.customOrder.length; i++) {
+          final panel = _layoutManager.customOrder[i];
+          if (panel == 'sidebar') {
+            children.add(_buildSidebar());
+          } else if (panel == 'main') {
+            children.add(Expanded(flex: 2, child: _buildMainContent()));
+          } else if (panel == 'sidepanel') {
+            children.add(Expanded(flex: 1, child: _buildSidePanel()));
+          }
+          if (i < _layoutManager.customOrder.length - 1) {
+            children.add(const VerticalDivider(width: 1, color: Colors.grey));
+          }
+        }
+        return Row(children: children);
       case AppLayoutMode.classic:
       default:
         return Row(
@@ -1529,26 +1538,79 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Layout Settings'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: AppLayoutMode.values.map((mode) {
-              return ListTile(
-                title: Text(mode.name.toUpperCase()),
-                leading: Radio<AppLayoutMode>(
-                  value: mode,
-                  groupValue: _layoutManager.currentMode,
-                  onChanged: (AppLayoutMode? value) {
-                    if (value != null) {
-                      _layoutManager.setMode(value);
-                      Navigator.pop(context);
-                    }
-                  },
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Layout Settings'),
+              content: SizedBox(
+                width: 400,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ...AppLayoutMode.values.map((mode) {
+                      return RadioListTile<AppLayoutMode>(
+                        title: Text(mode.name.toUpperCase()),
+                        value: mode,
+                        groupValue: _layoutManager.currentMode,
+                        onChanged: (AppLayoutMode? value) {
+                          if (value != null) {
+                            _layoutManager.setMode(value);
+                            setDialogState(() {});
+                          }
+                        },
+                      );
+                    }),
+                    if (_layoutManager.currentMode == AppLayoutMode.custom) ...[
+                      const Divider(height: 32),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: Text('Drag to Reorder Panels:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      SizedBox(
+                        height: 200,
+                        child: ReorderableListView(
+                          shrinkWrap: true,
+                          onReorder: (oldIndex, newIndex) {
+                            setDialogState(() {
+                              if (newIndex > oldIndex) newIndex -= 1;
+                              final items = List<String>.from(_layoutManager.customOrder);
+                              final item = items.removeAt(oldIndex);
+                              items.insert(newIndex, item);
+                              _layoutManager.setCustomOrder(items);
+                            });
+                          },
+                          children: _layoutManager.customOrder.map((panel) {
+                            String displayName = panel;
+                            IconData icon = Icons.check_box_outline_blank;
+                            if (panel == 'sidebar') { displayName = 'Navigation Sidebar'; icon = Icons.view_sidebar; }
+                            if (panel == 'main') { displayName = 'Main Library'; icon = Icons.library_music; }
+                            if (panel == 'sidepanel') { displayName = 'Queue & Lyrics Panel'; icon = Icons.queue_music; }
+
+                            return Card(
+                              key: ValueKey(panel),
+                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              child: ListTile(
+                                leading: Icon(icon),
+                                title: Text(displayName),
+                                trailing: const Icon(Icons.drag_handle),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-              );
-            }).toList(),
-          ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
