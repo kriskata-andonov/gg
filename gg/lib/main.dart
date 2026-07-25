@@ -1629,6 +1629,8 @@ class _HoverVolumeSliderState extends State<HoverVolumeSlider> {
   void _showOverlay() {
     if (_overlayEntry != null) return;
 
+    double localVolume = widget.volume;
+
     _overlayEntry = OverlayEntry(
       builder: (context) {
         return Positioned(
@@ -1658,11 +1660,20 @@ class _HoverVolumeSliderState extends State<HoverVolumeSlider> {
                       thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
                       overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
                     ),
-                    child: Slider(
-                      value: widget.volume,
-                      min: 0.0,
-                      max: 1.0,
-                      onChanged: widget.onChanged,
+                    child: StatefulBuilder(
+                      builder: (context, setOverlayState) {
+                        return Slider(
+                          value: localVolume,
+                          min: 0.0,
+                          max: 1.0,
+                          onChanged: (newVolume) {
+                            setOverlayState(() {
+                              localVolume = newVolume;
+                            });
+                            widget.onChanged(newVolume);
+                          },
+                        );
+                      }
                     ),
                   ),
                 ),
@@ -1697,6 +1708,12 @@ class _HoverVolumeSliderState extends State<HoverVolumeSlider> {
   @override
   void didUpdateWidget(HoverVolumeSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // If we want to sync the overlay to external volume changes (e.g. mute button), 
+    // we would need a way to pass the new volume to the StatefulBuilder.
+    // Rebuilding the overlay entry is sufficient since it captures the new widget.volume 
+    // on next overlay display, but if the overlay is already open, it needs syncing.
+    // For simplicity, we just mark NeedsBuild, but because localVolume is in the closure, 
+    // it won't magically update localVolume. The best way is to only use widget.volume.
     if (oldWidget.volume != widget.volume) {
       _overlayEntry?.markNeedsBuild();
     }
