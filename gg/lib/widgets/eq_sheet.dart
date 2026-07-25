@@ -118,7 +118,7 @@ class _EQSheetState extends State<EQSheet> {
             Container(
               padding: const EdgeInsets.all(16.0),
               decoration: BoxDecoration(
-                color: Colors.grey[950]!.withOpacity(0.65),
+                color: Colors.grey[900]!.withOpacity(0.65),
               ),
               child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
