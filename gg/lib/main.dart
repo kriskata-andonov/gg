@@ -50,8 +50,8 @@ class Song {
   final String artist;
   final String album;
   final String audioUrl;
-  final String coverUrl;
-  final String lyrics;
+  String coverUrl;
+  String lyrics;
   bool liked;
 
   Song({
@@ -1389,9 +1389,17 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 32),
             const Text("Lyrics", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            Text(
-              currentSong.lyrics,
-              style: TextStyle(fontSize: 16, height: 1.5, color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7)),
+            FutureBuilder<String>(
+              future: _fetchLyrics(currentSong),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting && currentSong.lyrics == 'Loading...') {
+                  return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
+                }
+                return Text(
+                  currentSong.lyrics,
+                  style: TextStyle(fontSize: 16, height: 1.5, color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7)),
+                );
+              },
             )
           ],
         ),
@@ -1582,5 +1590,33 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<String> _fetchLyrics(Song song) async {
+    if (song.lyrics != 'Loading...') {
+      return song.lyrics;
+    }
+    try {
+      final title = Uri.encodeComponent(song.title);
+      final artist = Uri.encodeComponent(song.artist);
+      final response = await http.get(Uri.parse('http://127.0.0.1:8000/api/lyrics?title=$title&artist=$artist'));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final fetched = data['lyrics'] as String? ?? 'No lyrics found.';
+        final coverUrl = data['coverUrl'] as String?;
+        if (mounted) {
+          setState(() {
+            song.lyrics = fetched;
+            if (coverUrl != null && coverUrl.isNotEmpty) {
+              song.coverUrl = coverUrl;
+            }
+          });
+        }
+        return fetched;
+      }
+    } catch (e) {
+      debugPrint('Failed to fetch lyrics: $e');
+    }
+    return 'Failed to load lyrics.';
   }
 }

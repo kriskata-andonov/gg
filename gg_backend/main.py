@@ -190,7 +190,7 @@ def get_genius_info(title, artist):
                     
                     lyrics = lyrics.strip()
                     # Remove the "X Contributors\nTitle Lyrics" prefix if present
-                    lyrics = re.sub(r'^.*Contributors\n.*Lyrics\n', '', lyrics, flags=re.IGNORECASE)
+                    lyrics = re.sub(r'^.*?Lyrics\n', '', lyrics, flags=re.IGNORECASE | re.DOTALL)
                     
                     return lyrics.strip(), cover_url
             print(f"DEBUG: No 'song' section found for {title} {artist}. Status: {response.status_code}")
@@ -222,16 +222,14 @@ def _fetch_all_songs() -> list:
                         title = tag.title or clean_filename
                         artist = tag.artist or "Unknown Artist"
                         
-                        lyrics, genius_cover_url = get_genius_info(title, artist)
-                        
                         songs.append({
                             "id": file_path,
                             "title": title,
                             "artist": artist,
                             "album": tag.album or "Unknown Album",
                             "audioUrl": f"http://127.0.0.1:8000/api/audio{quoted_path}",
-                            "coverUrl": genius_cover_url if genius_cover_url else f"http://127.0.0.1:8000/api/cover{quoted_path}",
-                            "lyrics": lyrics,
+                            "coverUrl": f"http://127.0.0.1:8000/api/cover{quoted_path}",
+                            "lyrics": "Loading...",
                             "liked": file_path in liked_songs
                         })
                     except Exception as e:
@@ -262,6 +260,11 @@ def get_songs():
 @app.get("/api/songs")
 def api_get_songs():
     return get_songs()
+
+@app.get("/api/lyrics")
+def get_lyrics(title: str, artist: str):
+    lyrics, cover_url = get_genius_info(title, artist)
+    return {"lyrics": lyrics, "coverUrl": cover_url}
 
 
 
