@@ -1,0 +1,32 @@
+# Environments
+gg_backend/venv/
+gg_backend/__pycache__/
+gg_backend/.pytest_cache/
+
+# Python Build
+gg_backend/build/
+gg_backend/dist/
+gg_backend/*.spec
+
+# Flutter/Dart Build
+gg/.dart_tool/
+gg/build/
+gg/.pub-cache/
+gg/.pub/
+gg/.flutter-plugins
+gg/.flutter-plugins-dependencies
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Agent/AI generated or temporary directories
+.agents/
+release_linux/
+release_web/
+release_windows/
