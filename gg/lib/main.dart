@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'player/custom_just_audio_media_kit.dart';
 import 'package:gg/controllers.dart';
+import 'package:gg/layout_manager.dart';
 import 'widgets/eq_sheet.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
@@ -162,6 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Song> _allSongs = [];
   QueueController<Song>? _queueController;
   final EQController _eqController = EQController();
+  final LayoutManager _layoutManager = LayoutManager();
 
   List<Map<String, dynamic>> _folders = [];
   List<Map<String, dynamic>> _playlists = [];
@@ -207,6 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initEQ() async {
     await _eqController.init();
+    await _layoutManager.init();
     _applyEQ();
   }
 
@@ -684,69 +687,69 @@ class _HomeScreenState extends State<HomeScreen> {
       onDragDone: _handleFileDrop,
       onDragEntered: (details) => setState(() => _isDragging = true),
       onDragExited: (details) => setState(() => _isDragging = false),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('GG Music'),
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(60),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              child: TextField(
-                onChanged: (value) => setState(() => _searchQuery = value),
-                decoration: InputDecoration(
-                  hintText: 'Search songs, artists, or albums...',
-                  prefixIcon: const Icon(Icons.search),
-                  filled: true,
-                  fillColor: Colors.grey[900],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
-                    borderSide: BorderSide.none,
+      child: ListenableBuilder(
+        listenable: _layoutManager,
+        builder: (context, _) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('GG Music'),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(60),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: TextField(
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                    decoration: InputDecoration(
+                      hintText: 'Search songs, artists, or albums...',
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: Colors.grey[900],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(30),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                    ),
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
                 ),
               ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.dashboard_customize),
+                  onPressed: _showLayoutSettings,
+                  tooltip: 'Layout Settings',
+                ),
+              ],
             ),
-          ),
-        ),
-        body: Stack(
-          children: [
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : Row(
-                    children: [
-                      _buildSidebar(),
-                      const VerticalDivider(width: 1, color: Colors.grey),
-                      Expanded(
-                        flex: 2,
-                        child: _buildMainContent(),
+            body: Stack(
+              children: [
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildDynamicLayout(),
+                if (_isDragging)
+                  Container(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
+                    child: const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.add_to_photos, size: 80, color: Colors.white),
+                          SizedBox(height: 16),
+                          Text(
+                            "Drop MP3 files to add them to your library",
+                            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                        ],
                       ),
-                      const VerticalDivider(width: 1, color: Colors.grey),
-                      Expanded(
-                        flex: 1,
-                        child: _buildSidePanel(),
-                      ),
-                    ],
+                    ),
                   ),
-            if (_isDragging)
-              Container(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
-                child: const Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add_to_photos, size: 80, color: Colors.white),
-                      SizedBox(height: 16),
-                      Text(
-                        "Drop MP3 files to add them to your library",
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
-        bottomNavigationBar: _buildBottomPlayer(),
+              ],
+            ),
+            bottomNavigationBar: _layoutManager.currentMode == AppLayoutMode.ytMusic 
+                ? null 
+                : _buildBottomPlayer(),
+          );
+        },
       ),
     );
   }
@@ -1411,6 +1414,95 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDynamicLayout() {
+    switch (_layoutManager.currentMode) {
+      case AppLayoutMode.spotify:
+        return Row(
+          children: [
+            _buildSidebar(),
+            const VerticalDivider(width: 1, color: Colors.grey),
+            Expanded(child: _buildMainContent()),
+          ],
+        );
+      case AppLayoutMode.ytMusic:
+        return Column(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: _buildMainContent(),
+                  ),
+                  const VerticalDivider(width: 1, color: Colors.grey),
+                  Expanded(
+                    flex: 1,
+                    child: Column(
+                      children: [
+                        Expanded(child: _buildSidePanel()),
+                        const Divider(height: 1, color: Colors.grey),
+                        SizedBox(
+                          height: 140, 
+                          child: _buildBottomPlayer(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      case AppLayoutMode.custom:
+        return const Center(
+          child: Text(
+            'Custom Modular Grid - Coming in Phase 2',
+            style: TextStyle(color: Colors.white, fontSize: 18),
+          ),
+        );
+      case AppLayoutMode.classic:
+      default:
+        return Row(
+          children: [
+            _buildSidebar(),
+            const VerticalDivider(width: 1, color: Colors.grey),
+            Expanded(flex: 2, child: _buildMainContent()),
+            const VerticalDivider(width: 1, color: Colors.grey),
+            Expanded(flex: 1, child: _buildSidePanel()),
+          ],
+        );
+    }
+  }
+
+  void _showLayoutSettings() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Layout Settings'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: AppLayoutMode.values.map((mode) {
+              return ListTile(
+                title: Text(mode.name.toUpperCase()),
+                leading: Radio<AppLayoutMode>(
+                  value: mode,
+                  groupValue: _layoutManager.currentMode,
+                  onChanged: (AppLayoutMode? value) {
+                    if (value != null) {
+                      _layoutManager.setMode(value);
+                      Navigator.pop(context);
+                    }
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        );
+      },
     );
   }
 
