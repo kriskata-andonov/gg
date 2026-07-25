@@ -1567,20 +1567,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   stream: _player.volumeStream,
                   builder: (context, snapshot) {
                     final volume = snapshot.data ?? 1.0;
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.volume_up, size: 20, color: Colors.grey),
-                        SizedBox(
-                          width: 80,
-                          child: Slider(
-                            value: volume,
-                            min: 0.0,
-                            max: 1.0,
-                            onChanged: _player.setVolume,
-                          ),
-                        ),
-                      ],
+                    return HoverVolumeSlider(
+                      volume: volume,
+                      onChanged: _player.setVolume,
                     );
                   },
                 ),
@@ -1618,5 +1607,128 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('Failed to fetch lyrics: $e');
     }
     return 'Failed to load lyrics.';
+  }
+}
+
+class HoverVolumeSlider extends StatefulWidget {
+  final double volume;
+  final ValueChanged<double> onChanged;
+
+  const HoverVolumeSlider({super.key, required this.volume, required this.onChanged});
+
+  @override
+  State<HoverVolumeSlider> createState() => _HoverVolumeSliderState();
+}
+
+class _HoverVolumeSliderState extends State<HoverVolumeSlider> {
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
+  bool _isHoveringIcon = false;
+  bool _isHoveringSlider = false;
+
+  void _showOverlay() {
+    if (_overlayEntry != null) return;
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) {
+        return Positioned(
+          width: 40,
+          height: 120,
+          child: CompositedTransformFollower(
+            link: _layerLink,
+            offset: const Offset(-8, -120),
+            showWhenUnlinked: false,
+            child: MouseRegion(
+              onEnter: (_) {
+                _isHoveringSlider = true;
+              },
+              onExit: (_) {
+                _isHoveringSlider = false;
+                _checkHide();
+              },
+              child: Material(
+                elevation: 8,
+                borderRadius: BorderRadius.circular(20),
+                color: Theme.of(context).cardColor,
+                child: RotatedBox(
+                  quarterTurns: 3,
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4.0,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
+                    ),
+                    child: Slider(
+                      value: widget.volume,
+                      min: 0.0,
+                      max: 1.0,
+                      onChanged: widget.onChanged,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _hideOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  void _checkHide() async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    if (!_isHoveringIcon && !_isHoveringSlider && mounted) {
+      _hideOverlay();
+    }
+  }
+
+  @override
+  void dispose() {
+    _hideOverlay();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(HoverVolumeSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.volume != widget.volume) {
+      _overlayEntry?.markNeedsBuild();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: MouseRegion(
+        onEnter: (_) {
+          _isHoveringIcon = true;
+          _showOverlay();
+        },
+        onExit: (_) {
+          _isHoveringIcon = false;
+          _checkHide();
+        },
+        child: IconButton(
+          icon: Icon(
+            widget.volume == 0
+                ? Icons.volume_off
+                : widget.volume < 0.5
+                    ? Icons.volume_down
+                    : Icons.volume_up,
+            color: Colors.grey,
+          ),
+          onPressed: () {
+            widget.onChanged(widget.volume == 0 ? 1.0 : 0.0);
+          },
+        ),
+      ),
+    );
   }
 }
