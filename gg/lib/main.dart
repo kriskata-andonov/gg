@@ -752,7 +752,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSidebar() {
+  Widget _buildSidebar({double? width}) {
     final items = [
       {'icon': Icons.music_note, 'label': 'All Songs'},
       {'icon': Icons.playlist_play, 'label': 'Playlists'},
@@ -770,7 +770,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : null;
 
     return Container(
-      width: 200,
+      width: width ?? 200,
       color: isDark ? Colors.grey[950] : Colors.grey[200],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -858,6 +858,25 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         }),
+      ),
+    );
+  }
+
+  Widget _buildDraggableDivider({required ValueChanged<double> onDrag}) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onPanUpdate: (details) {
+          onDrag(details.delta.dx);
+        },
+        child: Container(
+          width: 5,
+          color: Colors.transparent,
+          child: const Center(
+            child: VerticalDivider(width: 1, color: Colors.grey),
+          ),
+        ),
       ),
     );
   }
@@ -1508,18 +1527,35 @@ class _HomeScreenState extends State<HomeScreen> {
         final children = <Widget>[];
         for (int i = 0; i < _layoutManager.customOrder.length; i++) {
           final panel = _layoutManager.customOrder[i];
-          if (panel == 'sidebar') {
-            children.add(_buildSidebar());
-          } else if (panel == 'main') {
-            children.add(Expanded(flex: 2, child: _buildMainContent()));
-          } else if (panel == 'sidepanel') {
-            children.add(Expanded(flex: 1, child: _buildSidePanel()));
-          }
-          if (i < _layoutManager.customOrder.length - 1) {
-            children.add(const VerticalDivider(width: 1, color: Colors.grey));
+          
+          if (panel == 'sidebar' && _layoutManager.panelVisibility['sidebar'] == true) {
+            if (_layoutManager.navStyle == 'sidebar') {
+              children.add(_buildSidebar(width: _layoutManager.sidebarWidth));
+              children.add(_buildDraggableDivider(onDrag: (dx) => _layoutManager.updateSidebarWidth(dx)));
+            }
+          } else if (panel == 'main' && _layoutManager.panelVisibility['main'] == true) {
+            children.add(Expanded(child: _buildMainContent()));
+          } else if (panel == 'sidepanel' && _layoutManager.panelVisibility['sidepanel'] == true) {
+            if (children.isNotEmpty && children.last is Expanded) {
+              children.add(_buildDraggableDivider(onDrag: (dx) => _layoutManager.updateSidePanelWidth(-dx)));
+            }
+            children.add(SizedBox(width: _layoutManager.sidePanelWidth, child: _buildSidePanel()));
           }
         }
-        return Row(children: children);
+        
+        Widget row = Row(children: children);
+        
+        if (_layoutManager.navStyle == 'topBar' && _layoutManager.panelVisibility['sidebar'] == true) {
+           return Column(
+             children: [
+               _buildTopNavBar(),
+               const Divider(height: 1, color: Colors.grey),
+               Expanded(child: row),
+             ]
+           );
+        } else {
+           return row;
+        }
       case AppLayoutMode.classic:
       default:
         return Row(
@@ -1565,7 +1601,58 @@ class _HomeScreenState extends State<HomeScreen> {
                       const Divider(height: 32),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                        child: Text('Drag to Reorder Panels:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: Text('Navigation Style:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment(value: 'sidebar', label: Text('Sidebar')),
+                            ButtonSegment(value: 'topBar', label: Text('Top Nav Bar')),
+                          ],
+                          selected: {_layoutManager.navStyle},
+                          onSelectionChanged: (Set<String> newSelection) {
+                            setDialogState(() {
+                              _layoutManager.setNavStyle(newSelection.first);
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: Text('Panel Visibility:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          FilterChip(
+                            label: const Text('Nav'),
+                            selected: _layoutManager.panelVisibility['sidebar'] == true,
+                            onSelected: (val) {
+                              setDialogState(() => _layoutManager.setPanelVisibility('sidebar', val));
+                            },
+                          ),
+                          FilterChip(
+                            label: const Text('Main'),
+                            selected: _layoutManager.panelVisibility['main'] == true,
+                            onSelected: (val) {
+                              setDialogState(() => _layoutManager.setPanelVisibility('main', val));
+                            },
+                          ),
+                          FilterChip(
+                            label: const Text('Side Panel'),
+                            selected: _layoutManager.panelVisibility['sidepanel'] == true,
+                            onSelected: (val) {
+                              setDialogState(() => _layoutManager.setPanelVisibility('sidepanel', val));
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: Text('Drag to Reorder Horizontal Panels:', style: TextStyle(fontWeight: FontWeight.bold)),
                       ),
                       SizedBox(
                         height: 200,
@@ -1583,7 +1670,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           children: _layoutManager.customOrder.map((panel) {
                             String displayName = panel;
                             IconData icon = Icons.check_box_outline_blank;
-                            if (panel == 'sidebar') { displayName = 'Navigation Sidebar'; icon = Icons.view_sidebar; }
+                            if (panel == 'sidebar') { displayName = 'Navigation Area'; icon = Icons.view_sidebar; }
                             if (panel == 'main') { displayName = 'Main Library'; icon = Icons.library_music; }
                             if (panel == 'sidepanel') { displayName = 'Queue & Lyrics Panel'; icon = Icons.queue_music; }
 
@@ -1594,6 +1681,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 leading: Icon(icon),
                                 title: Text(displayName),
                                 trailing: const Icon(Icons.drag_handle),
+                                enabled: _layoutManager.panelVisibility[panel] == true,
                               ),
                             );
                           }).toList(),
