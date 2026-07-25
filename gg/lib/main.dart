@@ -694,32 +694,33 @@ class _HomeScreenState extends State<HomeScreen> {
             appBar: AppBar(
               title: const Text('GG Music'),
               bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(60),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  child: TextField(
-                    onChanged: (value) => setState(() => _searchQuery = value),
-                    decoration: InputDecoration(
-                      hintText: 'Search songs, artists, or albums...',
-                      prefixIcon: const Icon(Icons.search),
-                      filled: true,
-                      fillColor: Colors.grey[900],
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
+                preferredSize: Size.fromHeight((_layoutManager.currentMode == AppLayoutMode.ytMusic || 
+                  (_layoutManager.currentMode == AppLayoutMode.custom && _layoutManager.navStyle == 'topBar' && _layoutManager.panelVisibility['sidebar'] == true)) ? 120 : 60),
+                child: Column(
+                  children: [
+                    if (_layoutManager.currentMode == AppLayoutMode.ytMusic || 
+                       (_layoutManager.currentMode == AppLayoutMode.custom && _layoutManager.navStyle == 'topBar' && _layoutManager.panelVisibility['sidebar'] == true))
+                      _buildTopNavBar(),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                      child: TextField(
+                        onChanged: (value) => setState(() => _searchQuery = value),
+                        decoration: InputDecoration(
+                          hintText: 'Search songs, artists, or albums...',
+                          prefixIcon: const Icon(Icons.search),
+                          filled: true,
+                          fillColor: Colors.grey[900],
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
                     ),
-                  ),
+                  ],
                 ),
               ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.dashboard_customize),
-                  onPressed: _showLayoutSettings,
-                  tooltip: 'Layout Settings',
-                ),
-              ],
             ),
             body: Stack(
               children: [
@@ -871,10 +872,21 @@ class _HomeScreenState extends State<HomeScreen> {
           onDrag(details.delta.dx);
         },
         child: Container(
-          width: 5,
+          width: 12,
           color: Colors.transparent,
-          child: const Center(
-            child: VerticalDivider(width: 1, color: Colors.grey),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const VerticalDivider(width: 1, color: Colors.grey, thickness: 1),
+              Container(
+                width: 4,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1298,17 +1310,34 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           ValueListenableBuilder<ThemeMode>(
             valueListenable: themeModeNotifier,
-            builder: (context, themeMode, _) {
-              return SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Dark Mode'),
-                value: themeMode == ThemeMode.dark,
-                onChanged: (value) {
-                  themeModeNotifier.value = value ? ThemeMode.dark : ThemeMode.light;
+            builder: (context, currentMode, _) {
+              return SegmentedButton<ThemeMode>(
+                segments: const [
+                  ButtonSegment(value: ThemeMode.system, label: Text('System')),
+                  ButtonSegment(value: ThemeMode.light, label: Text('Light')),
+                  ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
+                ],
+                selected: {currentMode},
+                onSelectionChanged: (Set<ThemeMode> newSelection) {
+                  themeModeNotifier.value = newSelection.first;
                 },
               );
             },
           ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
+          const Text(
+            'Layout Settings',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.dashboard_customize),
+            label: const Text('Configure Layout'),
+            onPressed: _showLayoutSettings,
+          ),
+
           const SizedBox(height: 16),
           const Text('Select Primary Color:'),
           const SizedBox(height: 8),
@@ -1508,19 +1537,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         );
       case AppLayoutMode.ytMusic:
-        return Column(
+        return Row(
           children: [
-            _buildTopNavBar(),
-            const Divider(height: 1, color: Colors.grey),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(flex: 4, child: _buildMainContent()),
-                  const VerticalDivider(width: 1, color: Colors.grey),
-                  Expanded(flex: 2, child: _buildSidePanel()),
-                ],
-              ),
-            ),
+            Expanded(flex: 4, child: _buildMainContent()),
+            const VerticalDivider(width: 1, color: Colors.grey),
+            Expanded(flex: 2, child: _buildSidePanel()),
           ],
         );
       case AppLayoutMode.custom:
@@ -1546,13 +1567,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Widget row = Row(children: children);
         
         if (_layoutManager.navStyle == 'topBar' && _layoutManager.panelVisibility['sidebar'] == true) {
-           return Column(
-             children: [
-               _buildTopNavBar(),
-               const Divider(height: 1, color: Colors.grey),
-               Expanded(child: row),
-             ]
-           );
+           return row;
         } else {
            return row;
         }
