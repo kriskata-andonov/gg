@@ -201,6 +201,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _player.playbackEventStream.listen((event) {}, onError: (Object e, StackTrace stackTrace) {
       debugPrint('A stream error occurred: $e');
     });
+
+    _initEQ();
+  }
+
+  Future<void> _initEQ() async {
+    await _eqController.init();
+    _applyEQ();
   }
 
   void _applyEQ() {

@@ -1,4 +1,6 @@
 import 'dart:math';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 enum CustomLoopMode {
   off,
@@ -116,21 +118,60 @@ class EQController {
     'bassBoost': [6.0, 5.0, 3.0, 1.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
   };
 
-  final List<double> _gains = List.filled(10, 0.0);
+  Map<String, List<double>> userPresets = {};
+  Map<String, List<double>> get allPresets => {...presets, ...userPresets};
+
+  List<double> _gains = List.filled(10, 0.0);
 
   List<double> get gains => List.unmodifiable(_gains);
+
+  SharedPreferences? _prefs;
+
+  Future<void> init() async {
+    _prefs = await SharedPreferences.getInstance();
+    
+    final presetsString = _prefs!.getString('eq_user_presets');
+    if (presetsString != null) {
+      final Map<String, dynamic> decoded = jsonDecode(presetsString);
+      userPresets = decoded.map((key, value) {
+        return MapEntry(key, (value as List).map((e) => (e as num).toDouble()).toList());
+      });
+    }
+
+    final gainsString = _prefs!.getString('eq_last_gains');
+    if (gainsString != null) {
+      final decodedGains = jsonDecode(gainsString) as List;
+      _gains = decodedGains.map((e) => (e as num).toDouble()).toList();
+    }
+  }
+
+  void saveUserPreset(String name) {
+    userPresets[name] = List.from(_gains);
+    _prefs?.setString('eq_user_presets', jsonEncode(userPresets));
+  }
+
+  void deleteUserPreset(String name) {
+    userPresets.remove(name);
+    _prefs?.setString('eq_user_presets', jsonEncode(userPresets));
+  }
+
+  void _saveGains() {
+    _prefs?.setString('eq_last_gains', jsonEncode(_gains));
+  }
 
   void setGain(int bandIndex, double gain) {
     if (bandIndex < 0 || bandIndex >= 10) return;
     _gains[bandIndex] = gain.clamp(-10.0, 10.0);
+    _saveGains();
   }
 
   void applyPreset(String presetName) {
-    final presetGains = presets[presetName];
+    final presetGains = allPresets[presetName];
     if (presetGains != null) {
       for (int i = 0; i < 10; i++) {
-        setGain(i, presetGains[i]);
+        _gains[i] = presetGains[i].clamp(-10.0, 10.0);
       }
+      _saveGains();
     }
   }
 

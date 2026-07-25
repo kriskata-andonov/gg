@@ -23,15 +23,77 @@ class _EQSheetState extends State<EQSheet> {
     return freq.toStringAsFixed(1).replaceAll('.0', '');
   }
 
-  Widget _buildPresetButton(String label, String preset) {
-    return ElevatedButton(
-      onPressed: () {
-        setState(() {
-          widget.eqController.applyPreset(preset);
-        });
-        widget.onChanged();
+  String _capitalize(String s) => s.isEmpty ? '' : s[0].toUpperCase() + s.substring(1);
+
+  Widget _buildPresetButton(String label, String preset, bool isUser) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8.0),
+      child: ElevatedButton(
+        onPressed: () {
+          setState(() {
+            widget.eqController.applyPreset(preset);
+          });
+          widget.onChanged();
+        },
+        onLongPress: isUser ? () {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Delete Preset?'),
+              content: Text('Delete user preset "$label"?'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      widget.eqController.deleteUserPreset(preset);
+                    });
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
+          );
+        } : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isUser ? Theme.of(context).colorScheme.primaryContainer : null,
+          foregroundColor: isUser ? Theme.of(context).colorScheme.onPrimaryContainer : null,
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+
+  void _showSavePresetDialog() {
+    final TextEditingController nameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Save Preset'),
+          content: TextField(
+            controller: nameController,
+            decoration: const InputDecoration(hintText: 'Preset Name'),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                if (name.isNotEmpty) {
+                  setState(() {
+                    widget.eqController.saveUserPreset(name);
+                  });
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
       },
-      child: Text(label),
     );
   }
 
@@ -68,13 +130,17 @@ class _EQSheetState extends State<EQSheet> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildPresetButton('Flat', 'flat'),
-                const SizedBox(width: 8),
-                _buildPresetButton('Pop', 'pop'),
-                const SizedBox(width: 8),
-                _buildPresetButton('Rock', 'rock'),
-                const SizedBox(width: 8),
-                _buildPresetButton('Bass Boost', 'bassBoost'),
+                ActionChip(
+                  avatar: const Icon(Icons.add, size: 16),
+                  label: const Text('Save'),
+                  onPressed: _showSavePresetDialog,
+                ),
+                const SizedBox(width: 12),
+                ...widget.eqController.allPresets.keys.map((key) {
+                  final isUser = widget.eqController.userPresets.containsKey(key);
+                  final label = key == 'bassBoost' ? 'Bass Boost' : _capitalize(key);
+                  return _buildPresetButton(label, key, isUser);
+                }),
               ],
             ),
           ),
