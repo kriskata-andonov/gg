@@ -12,8 +12,13 @@ import 'package:rxdart/rxdart.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'backend_runner_stub.dart' if (dart.library.io) 'backend_runner_io.dart';
+import 'package:audio_service/audio_service.dart';
+import 'mpris_handler.dart';
+
+MprisAudioHandler? _audioHandler;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -159,6 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   bool _isDragging = false;
   Song? _currentlyPlayingSong;
+  String _sortOption = 'Title';
 
   List<Song> _allSongs = [];
   QueueController<Song>? _queueController;
@@ -185,6 +191,23 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _player = AudioPlayer();
+    
+    if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+      try {
+        AudioService.init(
+          builder: () => MprisAudioHandler(_player, _playNext, _playPrevious),
+          config: const AudioServiceConfig(
+            androidNotificationChannelId: 'com.example.gg.channel.audio',
+            androidNotificationChannelName: 'Music Playback',
+          ),
+        ).then((handler) {
+          _audioHandler = handler as MprisAudioHandler;
+        });
+      } catch (e) {
+        debugPrint('AudioService init failed: $e');
+      }
+    }
+
     _fetchSongs();
     _fetchFolders();
     _fetchPlaylists();
@@ -631,6 +654,16 @@ class _HomeScreenState extends State<HomeScreen> {
       _queueController!.activeIndex = index;
     });
 
+    if (_audioHandler != null) {
+      _audioHandler!.updateMediaItem(MediaItem(
+        id: song.audioUrl,
+        album: song.album,
+        title: song.title,
+        artist: song.artist,
+        artUri: song.coverUrl.isNotEmpty ? Uri.parse(song.coverUrl) : null,
+      ));
+    }
+
     try {
       print("PLAYING SONG: ${song.title} | URL: ${song.audioUrl}");
       // The backend now provides a fully encoded URL
@@ -920,7 +953,48 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(child: Text("No songs found. Drag and drop MP3s or configure scan folders in Settings!"));
     }
 
-    return ListView.builder(
+    filteredSongs.sort((a, b) {
+      switch (_sortOption) {
+        case 'Artist':
+          return a.artist.compareTo(b.artist);
+        case 'Album':
+          return a.album.compareTo(b.album);
+        case 'Title':
+        default:
+          return a.title.compareTo(b.title);
+      }
+    });
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('${filteredSongs.length} Songs', style: const TextStyle(fontWeight: FontWeight.bold)),
+              DropdownButton<String>(
+                value: _sortOption,
+                items: ['Title', 'Artist', 'Album'].map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text('Sort by $value'),
+                  );
+                }).toList(),
+                onChanged: (newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _sortOption = newValue;
+                    });
+                  }
+                },
+                underline: const SizedBox(),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: ListView.builder(
       itemCount: filteredSongs.length,
       itemBuilder: (context, index) {
         final song = filteredSongs[index];
@@ -976,6 +1050,9 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         );
       },
+    ),
+    ),
+    ],
     );
   }
 

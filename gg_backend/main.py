@@ -9,6 +9,10 @@ from contextlib import contextmanager
 from tinytag import TinyTag
 from urllib.parse import quote
 
+import json
+import urllib.request
+import urllib.parse
+
 app = FastAPI()
 
 app.add_middleware(
@@ -326,6 +330,29 @@ def unlike_song(song_path: str):
         cursor.execute("DELETE FROM liked_songs WHERE song_path = ?", (song_path,))
         conn.commit()
     return {"status": "unliked"}
+
+@app.delete("/api/folders")
+def remove_folder(folder: FolderCreate):
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM folders WHERE path = ?", (folder.path,))
+        conn.commit()
+    return {"status": "removed"}
+
+@app.get("/api/lyrics")
+def get_lyrics(artist: str, title: str):
+    try:
+        url = f"https://lrclib.net/api/get?artist_name={urllib.parse.quote(artist)}&track_name={urllib.parse.quote(title)}"
+        req = urllib.request.Request(url, headers={'User-Agent': 'GG-Music-App/1.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode())
+                lyrics = data.get("syncedLyrics") or data.get("plainLyrics")
+                if lyrics:
+                    return {"lyrics": lyrics}
+    except Exception as e:
+        print("Error fetching lyrics:", e)
+    return {"lyrics": "No lyrics found."}
 
 # GET, POST, DELETE for '/api/playlists'
 @app.get("/api/playlists")
