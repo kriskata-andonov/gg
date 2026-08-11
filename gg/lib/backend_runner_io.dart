@@ -19,7 +19,9 @@ Future<void> startBackend() async {
     final exeName = isWindows ? 'gg_backend_windows.exe' : 'gg_backend_linux';
     
     // First try looking for the compiled backend in the same directory (Release mode)
-    final backendExe = File(exeName);
+    final currentDirPath = File(Platform.resolvedExecutable).parent.path;
+    final backendExePath = '$currentDirPath${Platform.pathSeparator}$exeName';
+    final backendExe = File(backendExePath);
     if (await backendExe.exists()) {
       debugPrint("Starting compiled backend executable...");
       _backendProcess = await Process.start(
