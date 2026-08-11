@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+tinytag
+python-multipart
+pydantic
+starlette
