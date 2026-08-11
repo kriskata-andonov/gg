@@ -500,3 +500,8 @@ def get_audio_legacy(filename: str, request: Request):
         return FileResponse(file_path, media_type="audio/mpeg")
     return {"error": "File not found"}, 404
 
+if __name__ == "__main__":
+    import uvicorn
+    import multiprocessing
+    multiprocessing.freeze_support()
+    uvicorn.run(app, host="0.0.0.0", port=8000)
