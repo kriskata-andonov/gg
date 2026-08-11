@@ -4,3 +4,5 @@ tinytag
 python-multipart
 pydantic
 starlette
+requests
+beautifulsoup4
