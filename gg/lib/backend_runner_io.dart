@@ -50,7 +50,6 @@ Future<void> startBackend() async {
           }
         } catch (_) {}
       }
-    }
   } catch (e) {
     debugPrint("Failed to start backend: $e");
   }
