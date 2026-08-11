@@ -23,13 +23,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-AUDIO_DIR = "audio_files"
+import sys
+
+if getattr(sys, 'frozen', False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+AUDIO_DIR = os.path.join(BASE_DIR, "audio_files")
 if not os.path.exists(AUDIO_DIR):
     os.makedirs(AUDIO_DIR)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "gg.db")
-DEFAULT_AUDIO_DIR = os.path.join(BASE_DIR, "audio_files")
+DEFAULT_AUDIO_DIR = AUDIO_DIR
 
 @contextmanager
 def get_db():
