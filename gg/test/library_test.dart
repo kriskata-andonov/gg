@@ -504,8 +504,10 @@ void main() {
         await tester.tap(find.text('All Songs'));
         await tester.pumpAndSettle();
 
-        // Tap playlist_add next to Song Two (at index 1)
-        await tester.tap(find.byIcon(Icons.playlist_add).at(1));
+        // Tap more_vert next to Song Two (at index 1)
+        await tester.tap(find.byIcon(Icons.more_vert).at(1));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Add to Playlist'));
         await tester.pumpAndSettle();
 
         // Tap Favorites in the Dialog list

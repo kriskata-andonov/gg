@@ -1,0 +1,53 @@
+name: Build Windows Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # --- BACKEND (Python) ---
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Build Python Backend
+        run: |
+          cd gg_backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pyinstaller --onefile main.py
+          mkdir ../release_windows
+          copy dist\main.exe ../release_windows\gg_backend_windows.exe
+
+      # --- FRONTEND (Flutter) ---
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Build Flutter Frontend
+        run: |
+          cd gg
+          flutter pub get
+          flutter build windows
+          xcopy build\windows\x64\runner\Release\* ..\release_windows\ /E /H /C /I
+
+      # --- UPLOAD ARTIFACT ---
+      - name: Upload Release Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: gg-windows-release
+          path: release_windows/

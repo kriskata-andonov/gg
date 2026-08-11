@@ -52,8 +52,8 @@ void main() async {
 
 class Song {
   final String id;
-  final String title;
-  final String artist;
+  String title;
+  String artist;
   final String album;
   final String audioUrl;
   String coverUrl;
@@ -130,15 +130,16 @@ class MusicApp extends StatelessWidget {
               debugShowCheckedModeBanner: false,
               themeMode: themeMode,
               theme: ThemeData(
-                colorScheme: ColorScheme.light(
-                  primary: color,
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: color,
+                  brightness: Brightness.light,
                 ),
                 useMaterial3: true,
               ),
               darkTheme: ThemeData(
-                colorScheme: ColorScheme.dark(
-                  primary: color,
-                  surface: const Color(0xFF121212),
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: color,
+                  brightness: Brightness.dark,
                 ),
                 useMaterial3: true,
               ),
@@ -192,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _player = AudioPlayer();
     
-    if (!Platform.environment.containsKey('FLUTTER_TEST')) {
+    if (!kIsWeb && !Platform.environment.containsKey('FLUTTER_TEST')) {
       try {
         AudioService.init(
           builder: () => MprisAudioHandler(_player, _playNext, _playPrevious),
@@ -374,7 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _addPlaylist(String name) async {
+  Future<void> _addPlaylist(String name, [Song? initialSong]) async {
     try {
       final response = await http.post(
         Uri.parse('http://127.0.0.1:8000/api/playlists'),
@@ -383,6 +384,11 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       if (response.statusCode == 200) {
         await _fetchPlaylists();
+        if (initialSong != null) {
+          final data = jsonDecode(response.body);
+          final newId = data['id'] as int;
+          _addSongToPlaylist(newId, initialSong);
+        }
       } else {
         final error = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -549,6 +555,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
           actions: [
             TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _showAddPlaylistDialog(initialSong: song);
+              },
+              child: const Text('Create New Playlist'),
+            ),
+            TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Close'),
             ),
@@ -558,7 +571,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showAddPlaylistDialog() {
+  void _showAddPlaylistDialog({Song? initialSong}) {
     final TextEditingController nameController = TextEditingController();
     showDialog(
       context: context,
@@ -582,7 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 final name = nameController.text.trim();
                 if (name.isNotEmpty) {
                   Navigator.pop(context);
-                  _addPlaylist(name);
+                  _addPlaylist(name, initialSong);
                 }
               },
               child: const Text('Create'),
@@ -591,6 +604,77 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+
+  void _showEditSongDialog(Song song) {
+    final titleController = TextEditingController(text: song.title);
+    final artistController = TextEditingController(text: song.artist);
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Song Info'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(labelText: 'Title'),
+              ),
+              TextField(
+                controller: artistController,
+                decoration: const InputDecoration(labelText: 'Artist'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final newTitle = titleController.text.trim();
+                final newArtist = artistController.text.trim();
+                if (newTitle.isNotEmpty && newArtist.isNotEmpty) {
+                  Navigator.pop(context);
+                  _editSongInfo(song, newTitle, newArtist);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _editSongInfo(Song song, String newTitle, String newArtist) async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://127.0.0.1:8000/api/songs/edit'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'song_path': song.id, 'title': newTitle, 'artist': newArtist}),
+      );
+      if (response.statusCode == 200) {
+        setState(() {
+          song.title = newTitle;
+          song.artist = newArtist;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Song info updated!')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update song info: ${response.body}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating song info: $e')),
+      );
+    }
   }
 
   Future<void> _handleFileDrop(DropDoneDetails details) async {
@@ -972,23 +1056,32 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('${filteredSongs.length} Songs', style: const TextStyle(fontWeight: FontWeight.bold)),
-              DropdownButton<String>(
-                value: _sortOption,
-                items: ['Title', 'Artist', 'Album'].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text('Sort by $value'),
-                  );
-                }).toList(),
-                onChanged: (newValue) {
-                  if (newValue != null) {
-                    setState(() {
-                      _sortOption = newValue;
-                    });
-                  }
-                },
-                underline: const SizedBox(),
+              Expanded(
+                child: Text('${filteredSongs.length} Songs', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: DropdownButton<String>(
+                  value: _sortOption,
+                  items: ['Title', 'Artist', 'Album'].map((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text('Sort by $value'),
+                    );
+                  }).toList(),
+                  onChanged: (newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        _sortOption = newValue;
+                      });
+                    }
+                  },
+                  underline: const SizedBox(),
+                ),
               ),
             ],
           ),
@@ -1027,6 +1120,11 @@ class _HomeScreenState extends State<HomeScreen> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (isPlayingThis)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8.0),
+                  child: Icon(Icons.equalizer, color: Theme.of(context).colorScheme.primary),
+                ),
               IconButton(
                 icon: Icon(
                   song.liked ? Icons.favorite : Icons.favorite_border,
@@ -1034,15 +1132,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 onPressed: () => _toggleLiked(song),
               ),
-              IconButton(
-                icon: const Icon(Icons.playlist_add, color: Colors.grey),
-                onPressed: () => _showAddToPlaylistDialog(song),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Colors.grey),
+                onSelected: (value) {
+                  if (value == 'playlist') {
+                    _showAddToPlaylistDialog(song);
+                  } else if (value == 'edit') {
+                    _showEditSongDialog(song);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'playlist', child: Text('Add to Playlist')),
+                  const PopupMenuItem(value: 'edit', child: Text('Edit Info')),
+                ],
               ),
-              if (isPlayingThis)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0),
-                  child: Icon(Icons.equalizer, color: Theme.of(context).colorScheme.primary),
-                ),
             ],
           ),
           onTap: () {

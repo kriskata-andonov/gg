@@ -89,7 +89,13 @@ class PlaylistCreate(BaseModel):
     name: str
 
 class PlaylistSongCreate(BaseModel):
+    playlist_id: int
     song_path: str
+
+class SongEdit(BaseModel):
+    song_path: str
+    title: str
+    artist: str
 
 @app.get("/")
 def read_root():
@@ -208,6 +214,18 @@ def _fetch_all_songs() -> list:
     songs = []
     folders = load_folders()
     liked_songs = load_liked_songs()
+    
+    song_metadata = {}
+    try:
+        with get_db() as conn:
+            cursor = conn.cursor()
+            cursor.execute("CREATE TABLE IF NOT EXISTS song_metadata (song_path TEXT PRIMARY KEY, title TEXT, artist TEXT)")
+            cursor.execute("SELECT song_path, title, artist FROM song_metadata")
+            for row in cursor.fetchall():
+                song_metadata[row[0]] = {"title": row[1], "artist": row[2]}
+    except Exception as e:
+        print(f"Error loading song metadata: {e}")
+
     for folder in folders:
         if not os.path.exists(folder):
             continue
@@ -223,8 +241,15 @@ def _fetch_all_songs() -> list:
                         quoted_path = quote(file_path)
                         
                         clean_filename = filename[:-4] if filename.lower().endswith(".mp3") else filename
-                        title = tag.title or clean_filename
-                        artist = tag.artist or "Unknown Artist"
+                        
+                        # Apply overrides if available
+                        meta = song_metadata.get(file_path)
+                        if meta:
+                            title = meta["title"]
+                            artist = meta["artist"]
+                        else:
+                            title = tag.title or clean_filename
+                            artist = tag.artist or "Unknown Artist"
                         
                         songs.append({
                             "id": file_path,
@@ -240,10 +265,19 @@ def _fetch_all_songs() -> list:
                         print(f"Error parsing {file_path}: {e}")
                         quoted_path = quote(file_path)
                         clean_filename = filename[:-4] if filename.lower().endswith(".mp3") else filename
+                        
+                        meta = song_metadata.get(file_path)
+                        if meta:
+                            title = meta["title"]
+                            artist = meta["artist"]
+                        else:
+                            title = clean_filename
+                            artist = "Unknown Artist"
+                        
                         songs.append({
                             "id": file_path,
-                            "title": clean_filename,
-                            "artist": "Unknown Artist",
+                            "title": title,
+                            "artist": artist,
                             "album": "Unknown Album",
                             "audioUrl": f"http://127.0.0.1:8000/api/audio{quoted_path}",
                             "coverUrl": f"http://127.0.0.1:8000/api/cover{quoted_path}",
@@ -314,6 +348,7 @@ def get_liked_songs():
 
 @app.post("/api/liked")
 def like_song(body: LikedSongCreate):
+    global _songs_cache
     with get_db() as conn:
         cursor = conn.cursor()
         try:
@@ -321,15 +356,42 @@ def like_song(body: LikedSongCreate):
             conn.commit()
         except sqlite3.IntegrityError:
             pass
+    if _songs_cache is not None:
+        for s in _songs_cache:
+            if s["id"] == body.song_path:
+                s["liked"] = True
+                break
     return {"song_path": body.song_path, "status": "liked"}
 
 @app.delete("/api/liked")
 def unlike_song(song_path: str):
+    global _songs_cache
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute("DELETE FROM liked_songs WHERE song_path = ?", (song_path,))
         conn.commit()
+    if _songs_cache is not None:
+        for s in _songs_cache:
+            if s["id"] == song_path:
+                s["liked"] = False
+                break
     return {"status": "unliked"}
+
+@app.post("/api/songs/edit")
+def edit_song(body: SongEdit):
+    global _songs_cache
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS song_metadata (song_path TEXT PRIMARY KEY, title TEXT, artist TEXT)")
+        cursor.execute("INSERT OR REPLACE INTO song_metadata (song_path, title, artist) VALUES (?, ?, ?)", (body.song_path, body.title, body.artist))
+        conn.commit()
+    if _songs_cache is not None:
+        for s in _songs_cache:
+            if s["id"] == body.song_path:
+                s["title"] = body.title
+                s["artist"] = body.artist
+                break
+    return {"status": "success"}
 
 @app.delete("/api/folders")
 def remove_folder(folder: FolderCreate):

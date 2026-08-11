@@ -15,14 +15,30 @@ Future<void> startBackend() async {
   } catch (e) {}
 
   try {
-    final backendDir = Directory('../gg_backend');
-    if (await backendDir.exists()) {
-      debugPrint("Starting Python backend...");
+    final isWindows = Platform.isWindows;
+    final exeName = isWindows ? 'gg_backend_windows.exe' : 'gg_backend_linux';
+    
+    // First try looking for the compiled backend in the same directory (Release mode)
+    final backendExe = File(exeName);
+    if (await backendExe.exists()) {
+      debugPrint("Starting compiled backend executable...");
       _backendProcess = await Process.start(
-        'venv/bin/uvicorn',
-        ['main:app', '--host', '0.0.0.0', '--port', '8000'],
-        workingDirectory: backendDir.path,
+        backendExe.absolute.path,
+        ['--host', '0.0.0.0', '--port', '8000'],
       );
+    } else {
+      // Fallback for development mode
+      final backendDir = Directory('../gg_backend');
+      if (await backendDir.exists()) {
+        debugPrint("Starting Python backend via uvicorn...");
+        final uvicornPath = isWindows ? 'venv\\Scripts\\uvicorn.exe' : 'venv/bin/uvicorn';
+        _backendProcess = await Process.start(
+          uvicornPath,
+          ['main:app', '--host', '0.0.0.0', '--port', '8000'],
+          workingDirectory: backendDir.path,
+        );
+      }
+    }
       
       for (int i = 0; i < 10; i++) {
         await Future.delayed(const Duration(milliseconds: 500));
