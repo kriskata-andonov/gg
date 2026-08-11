@@ -26,7 +26,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
-          pyinstaller --onefile main.py
+          pyinstaller --noconsole --onefile main.py
           mkdir ../release_windows
           copy dist\main.exe ../release_windows\gg_backend_windows.exe
 
