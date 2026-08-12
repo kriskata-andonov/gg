@@ -23,7 +23,11 @@ MprisAudioHandler? _audioHandler;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!kIsWeb) {
-    CustomJustAudioMediaKit.ensureInitialized();
+    try {
+      CustomJustAudioMediaKit.ensureInitialized();
+    } catch (e) {
+      debugPrint("WARNING: Failed to initialize MediaKit: $e");
+    }
   }
   
   final prefs = await SharedPreferences.getInstance();
