@@ -682,8 +682,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleFileDrop(DropDoneDetails details) async {
+    final validExts = ['.mp3', '.wav', '.m4a', '.flac', '.ogg'];
     for (final file in details.files) {
-      if (file.path.toLowerCase().endsWith('.mp3')) {
+      final ext = file.path.toLowerCase();
+      if (validExts.any((e) => ext.endsWith(e))) {
         await _uploadFile(file);
       }
     }

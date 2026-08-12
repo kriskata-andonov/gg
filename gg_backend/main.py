@@ -131,6 +131,8 @@ def create_folder(folder: FolderCreate):
             cursor.execute("INSERT INTO folders (path) VALUES (?)", (folder.path,))
             conn.commit()
             folder_id = cursor.lastrowid
+            global _songs_cache
+            _songs_cache = None
             return {"id": folder_id, "path": folder.path}
         except sqlite3.IntegrityError:
             raise HTTPException(status_code=400, detail="Folder already exists")
@@ -146,6 +148,8 @@ def delete_folder(id: int = None, path: str = None):
         else:
             cursor.execute("DELETE FROM folders WHERE path = ?", (path,))
         conn.commit()
+    global _songs_cache
+    _songs_cache = None
     return {"status": "success"}
 
 
@@ -244,7 +248,7 @@ def _fetch_all_songs() -> list:
             continue
         for root, dirs, files in os.walk(folder):
             for filename in files:
-                if filename.lower().endswith(".mp3"):
+                if filename.lower().endswith((".mp3", ".wav", ".m4a", ".flac", ".ogg")):
                     file_path = os.path.abspath(os.path.join(root, filename))
                     # Avoid duplicates if folders overlap
                     if any(s["id"] == file_path for s in songs):
@@ -253,7 +257,11 @@ def _fetch_all_songs() -> list:
                         tag = TinyTag.get(file_path)
                         quoted_path = quote(file_path)
                         
-                        clean_filename = filename[:-4] if filename.lower().endswith(".mp3") else filename
+                        clean_filename = filename
+                        for ext in (".mp3", ".wav", ".m4a", ".flac", ".ogg"):
+                            if filename.lower().endswith(ext):
+                                clean_filename = filename[:-len(ext)]
+                                break
                         
                         # Apply overrides if available
                         meta = song_metadata.get(file_path)
@@ -269,15 +277,19 @@ def _fetch_all_songs() -> list:
                             "title": title,
                             "artist": artist,
                             "album": tag.album or "Unknown Album",
-                            "audioUrl": f"http://127.0.0.1:8000/api/audio{quoted_path}",
-                            "coverUrl": f"http://127.0.0.1:8000/api/cover{quoted_path}",
+                            "audioUrl": f"http://127.0.0.1:8000/api/audio/{quoted_path}",
+                            "coverUrl": f"http://127.0.0.1:8000/api/cover/{quoted_path}",
                             "lyrics": "Loading...",
                             "liked": file_path in liked_songs
                         })
                     except Exception as e:
                         print(f"Error parsing {file_path}: {e}")
                         quoted_path = quote(file_path)
-                        clean_filename = filename[:-4] if filename.lower().endswith(".mp3") else filename
+                        clean_filename = filename
+                        for ext in (".mp3", ".wav", ".m4a", ".flac", ".ogg"):
+                            if filename.lower().endswith(ext):
+                                clean_filename = filename[:-len(ext)]
+                                break
                         
                         meta = song_metadata.get(file_path)
                         if meta:
@@ -292,8 +304,8 @@ def _fetch_all_songs() -> list:
                             "title": title,
                             "artist": artist,
                             "album": "Unknown Album",
-                            "audioUrl": f"http://127.0.0.1:8000/api/audio{quoted_path}",
-                            "coverUrl": f"http://127.0.0.1:8000/api/cover{quoted_path}",
+                            "audioUrl": f"http://127.0.0.1:8000/api/audio/{quoted_path}",
+                            "coverUrl": f"http://127.0.0.1:8000/api/cover/{quoted_path}",
                             "lyrics": "No lyrics found.",
                             "liked": file_path in liked_songs
                         })
@@ -328,7 +340,7 @@ def api_scan_songs():
 # GET '/api/audio/{path:path}'
 @app.api_route("/api/audio/{path:path}", methods=["GET", "HEAD"])
 def get_audio_api(path: str, request: Request):
-    if not path.startswith("/"):
+    if not path.startswith("/") and not (len(path) > 1 and path[1] == ':'):
         path = "/" + path
     if os.path.exists(path) and os.path.isfile(path):
         return FileResponse(path, media_type="audio/mpeg")
@@ -337,7 +349,7 @@ def get_audio_api(path: str, request: Request):
 # GET '/api/cover/{path:path}'
 @app.api_route("/api/cover/{path:path}", methods=["GET", "HEAD"])
 def get_cover_api(path: str, request: Request):
-    if not path.startswith("/"):
+    if not path.startswith("/") and not (len(path) > 1 and path[1] == ':'):
         path = "/" + path
     if os.path.exists(path) and os.path.isfile(path):
         try:
@@ -504,6 +516,8 @@ async def upload_song(file: UploadFile = File(...)):
     file_path = os.path.join(AUDIO_DIR, file.filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
+    global _songs_cache
+    _songs_cache = None
     return {"filename": file.filename, "status": "success"}
 
 @app.api_route("/audio/{filename}", methods=["GET", "HEAD"])
