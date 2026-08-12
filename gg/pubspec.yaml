@@ -41,7 +41,7 @@ dependencies:
   http: ^1.6.0
   just_audio_media_kit: ^2.1.0
   media_kit_libs_linux: ^1.2.1
-  media_kit_libs_windows_audio: ^1.2.1
+  media_kit_libs_windows_audio: ^1.0.9
   audio_video_progress_bar: ^2.0.3
   rxdart: ^0.28.0
   desktop_drop: ^0.7.1
